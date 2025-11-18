@@ -1,0 +1,11 @@
+body {
+    margin: 0;
+    font-family: Arial;
+}
+#map {
+    height: 90vh;
+    width: 100vw;
+}
+h2 {
+    margin: 10px;
+}
