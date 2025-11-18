@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+
 from db import SessionLocal, init_db
 from models import Microwave
 
@@ -42,6 +43,10 @@ def mark_broken(id):
     m.broken = True
     db.commit()
     return jsonify({"success": True})
+
+@app.get("/")
+def index():
+    return render_template("index.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
