@@ -3,9 +3,40 @@ body {
     font-family: Arial;
 }
 #map {
-    height: 90vh;
+    height: 100vh;
     width: 100vw;
 }
-h2 {
-    margin: 10px;
+
+.header-panel {
+    background: white;
+    padding: 10px 14px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    font-size: 18px;
+    font-weight: bold;
+}
+
+
+.info-panel {
+    background: white;
+    padding: 12px 14px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-size: 14px;
+    min-width: 220px;
+}
+
+.info-panel button {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px;
+    border: none;
+    border-radius: 6px;
+    background: #007bff;
+    color: white;
+    cursor: pointer;
+}
+
+.info-panel button:hover {
+    background: #0056b3;
 }
