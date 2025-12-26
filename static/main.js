@@ -14,16 +14,14 @@ async function loadMicrowaves() {
         let amount = await amtreported(m.id);
 
         marker.bindPopup(`
-            <h3>${m.building}</h3></br>
+            <h3>${m.building}</h3>
             ${m.desc}</br>
-            ${amount} users reported it broken.
+            ${amount} users reported it broken.</br>
             <button onclick="reportBroken(${m.id})">Report Broken</button>
         
         `);
     });
 }
-
-
 
 async function loadBuildings() {
     let res = await fetch("/buildings")
@@ -51,10 +49,11 @@ async function reportBroken(id) {
             microwave_id: id
         })
     });
+    
     location.reload();
 
 }
-
+// can definitely make this faster.
 async function amtreported(id) {
 
     let res = await fetch("/reports")
@@ -93,13 +92,13 @@ map.on("click", async (e) => {
 });
 
 loadMicrowaves();
-loadBuildings();
+// loadBuildings();
 
 let userMarker = null;
 let closestLine = null;
 let ulatlng = null;
-let buildingsWithDistance = [];
-let closestBuildingIndex = 0;
+let microwavesWithDistance = [];
+let closestMicrowaveIndex = 0;
 
 map.locate({ setView: true, maxZoom: 16 });
 map.on("locationfound", onLocationFound);
@@ -112,7 +111,7 @@ function onLocationFound(e) {
     userMarker = L.marker(e.latlng).addTo(map);
     ulatlng = L.latLng(e.latlng.lat, e.latlng.lng);
 
-    locateClosestBuilding();
+    locateClosestMicrowave();
 }
 
 function onLocationError(e) {
@@ -132,26 +131,29 @@ header.onAdd = function () {
 
 header.addTo(map);
 
-header.addTo(map);
 infoControl.onAdd = function () {
     this._div = L.DomUtil.create("div", "info-panel");
     this.update();
     return this._div;
 };
 
-infoControl.update = function (building = null) {
-    if (!building) {
-        this._div.innerHTML = "Finding nearest building...";
+infoControl.update = function (microwave = null) {
+    if (!microwave) {
+        this._div.innerHTML = "Finding nearest microwave...";
         return;
     }
 
     this._div.innerHTML = `
-        <b>${building.name}</b><br>
-        ${(building.distance / 1000).toFixed(2)} km away<br>
-        <a href="https://www.google.com/maps?q=${building.lat},${building.lng}" 
+        Located in: <b>${microwave.building}</b> | <i>${(microwave.distance / 1000).toFixed(2)} km away </i> <br>
+
+        <a href="https://www.google.com/maps?q=${microwave.lat},${microwave.lng}" 
            target="_blank" rel="noopener">
            Open in Google Maps
-        </a><br><br>
+        </a><br>
+        Description: <br>
+        ${microwave.description} <br><br>
+        <b><i>${microwave.report_amt} users reported broken</i></b>
+        <button class="report" onclick="reportBroken(${microwave.id})">Report Broken</button>
         <button onclick="nextLocation()">Next Closest</button>
         <button onclick="previousLocation()">Previous Closest</button>
     `;
@@ -159,31 +161,34 @@ infoControl.update = function (building = null) {
 
 infoControl.addTo(map);
 
-async function locateClosestBuilding() {
+async function locateClosestMicrowave() {
 
-    buildingsWithDistance = [];
-    closestBuildingIndex = 0;
+    microwavesWithDistance = [];
+    closestMicrowaveIndex = 0;
 
-    let res = await fetch("/buildings");
+    let res = await fetch("/microwaves");
     let data = await res.json();
     if (!data.length) return;
 
-    data.forEach(b => {
-        let buildingLatLng = L.latLng(b.lat, b.lng);
-        let tempDistance = ulatlng.distanceTo(buildingLatLng);
+    for (const m of data) {
+        let microwaveLatLng = L.latLng(m.lat, m.lng);
+        let tempDistance = ulatlng.distanceTo(microwaveLatLng);
+        let amt = await amtreported(m.id);
 
-        buildingsWithDistance.push({
-            id: b.id,
-            name: b.name,
-            lat: b.lat,
-            lng: b.lng,
+        microwavesWithDistance.push({
+            id: m.id,
+            building: m.building,
+            lat: m.lat,
+            lng: m.lng,
+            report_amt: amt,
+            description: m.desc,
             distance: tempDistance
         });
-    });
+    };
 
-    buildingsWithDistance.sort((a, b) => a.distance - b.distance);
+    microwavesWithDistance.sort((a, b) => a.distance - b.distance);
 
-    showBuilding(0);
+    showMicrowave(0);
     
 }
 
@@ -211,40 +216,40 @@ async function getClosestBuilding(e){
     return buildingName;
 }
 
-function showBuilding(index) {
-    if (index < 0 || index >= buildingsWithDistance.length) return;
+function showMicrowave(index) {
+    if (index < 0 || index >= microwavesWithDistance.length) return;
 
-    closestBuildingIndex = index;
-    let building = buildingsWithDistance[index];
+    closestMicrowaveIndex = index;
+    let microwave = microwavesWithDistance[index];
 
     if (closestLine) map.removeLayer(closestLine);
 
     closestLine = L.polyline(
-        [ulatlng, L.latLng(building.lat, building.lng)],
+        [ulatlng, L.latLng(microwave.lat, microwave.lng)],
         { color: "red", weight: 3, opacity: 0.7 }
     ).addTo(map);
 
-    infoControl.update(building)
+    infoControl.update(microwave)
 }
 
 function nextLocation() {
-    let nextIndex = closestBuildingIndex + 1;
+    let nextIndex = closestMicrowaveIndex + 1;
 
-    if (nextIndex >= buildingsWithDistance.length) {
-        alert("No more buildings.");
+    if (nextIndex >= microwavesWithDistance.length) {
+        alert("No more microwaves.");
         return;
     }
 
-    showBuilding(nextIndex);
+    showMicrowave(nextIndex);
 }
 
 function previousLocation() {
-    let nextIndex = closestBuildingIndex - 1;
+    let nextIndex = closestMicrowaveIndex - 1;
 
     if (nextIndex < 0) {
-        alert("No closer building.");
+        alert("No closer microwave.");
         return;
     }
 
-    showBuilding(nextIndex);
+    showMicrowave(nextIndex);
 }
