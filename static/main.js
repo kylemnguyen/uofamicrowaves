@@ -5,6 +5,21 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
+let userMarker = null;
+let closestLine = null;
+let ulatlng = null;
+let microwavesWithDistance = [];
+let closestMicrowaveIndex = 0;
+
+map.locate({ setView: true, maxZoom: 16 });
+map.on("locationfound", onLocationFound);
+map.on("locationerror", onLocationError);
+
+/**
+ * 
+ * Load's all microwave markers onto the map.
+ * 
+ */
 async function loadMicrowaves() {
     let res = await fetch("/microwaves");
     let data = await res.json();
@@ -23,6 +38,11 @@ async function loadMicrowaves() {
     });
 }
 
+/**
+ * 
+ * Loads all building markers onto the map.
+ * 
+ */
 async function loadBuildings() {
     let res = await fetch("/buildings")
     let data = await res.json();
@@ -39,6 +59,13 @@ async function loadBuildings() {
     })
 }
 
+/**
+ * 
+ * @param {*} id | id of microwave to report broken
+ * Creates a new report object with date
+ * TODO: add functionality where we only get reports from within the last 7 days
+ * 
+ */
 async function reportBroken(id) {
 
     await fetch("/reports", {
@@ -53,7 +80,14 @@ async function reportBroken(id) {
     location.reload();
 
 }
+
 // can definitely make this faster.
+/**
+ * 
+ * @param {*} id | microwave id
+ * @returns amt | Amt of broken reports
+ * TODO: only return amount of broken reports in the last 7 days
+ */
 async function amtreported(id) {
 
     let res = await fetch("/reports")
@@ -71,7 +105,11 @@ async function amtreported(id) {
     return amt;
 }
 
-
+/**
+ * 
+ * Temporarily allow for microwaves to be added on map clicks,
+ * prompts user to add a description
+ */
 map.on("click", async (e) => {
     const desc = prompt("Description");
     if (!desc) return;
@@ -94,16 +132,14 @@ map.on("click", async (e) => {
 loadMicrowaves();
 // loadBuildings();
 
-let userMarker = null;
-let closestLine = null;
-let ulatlng = null;
-let microwavesWithDistance = [];
-let closestMicrowaveIndex = 0;
-
-map.locate({ setView: true, maxZoom: 16 });
-map.on("locationfound", onLocationFound);
-map.on("locationerror", onLocationError);
-
+/**
+ * 
+ * @param {*} e | this is the user location's information
+ * 
+ * initialize user's location and sets a marker on the map of wher ethe user is
+ * calls locateClosestMicrowave() to find the closest microwave
+ * 
+ */
 function onLocationFound(e) {
     if (userMarker) map.removeLayer(userMarker);
     if (closestLine) map.removeLayer(closestLine);
@@ -114,10 +150,16 @@ function onLocationFound(e) {
     locateClosestMicrowave();
 }
 
+/**
+ * 
+ * @param {*} e 
+ * user declines location
+ */
 function onLocationError(e) {
     alert(e.message);
 }
 
+// UI ---------------------
 let infoControl = L.control({ position: "bottomleft" });
 let header = L.control({position: "topright"});
 
@@ -137,6 +179,17 @@ infoControl.onAdd = function () {
     return this._div;
 };
 
+
+/**
+ * 
+ * @param {*} microwave 
+ * @returns 
+ * This sets the microwave's details for the user. 
+ * Allows functionality to change microwaves
+ * Allows for google map directions
+ * Showcases amount of people who reported the microwave broken
+ * 
+ */
 infoControl.update = function (microwave = null) {
     if (!microwave) {
         this._div.innerHTML = "Finding nearest microwave...";
@@ -161,6 +214,13 @@ infoControl.update = function (microwave = null) {
 
 infoControl.addTo(map);
 
+/**
+ * 
+ * @returns 
+ * This function initalizes the array microwaveswithdistance from closest to farthest
+ * Also grabs the amount of reported of users who reported it broken 
+ * Calls showMicrowave() which displays the current microwave
+ */
 async function locateClosestMicrowave() {
 
     microwavesWithDistance = [];
@@ -192,6 +252,13 @@ async function locateClosestMicrowave() {
     
 }
 
+/**
+ * temporary
+ * @param {*} e 
+ * @returns 
+ * 
+ * grabs the closest building for the microwave for it's description
+ */
 async function getClosestBuilding(e){
     let res = await fetch("/buildings");
     let data = await res.json();
@@ -216,6 +283,13 @@ async function getClosestBuilding(e){
     return buildingName;
 }
 
+/**
+ * 
+ * @param {} index 
+ * @returns 
+ * 
+ * Displays teh current index in the microwavesWithDistance Array, then plots a line on the map from the users' location to the microwaveß
+ */
 function showMicrowave(index) {
     if (index < 0 || index >= microwavesWithDistance.length) return;
 
@@ -232,12 +306,16 @@ function showMicrowave(index) {
     infoControl.update(microwave)
 }
 
+/**
+ * 
+ * @returns Thsese functions increase and decrease the microwave index, aswell as telling if there is no more microwaves to view.
+ */
 function nextLocation() {
     let nextIndex = closestMicrowaveIndex + 1;
 
     if (nextIndex >= microwavesWithDistance.length) {
         alert("No more microwaves.");
-        return;
+        return;ß
     }
 
     showMicrowave(nextIndex);
