@@ -14,20 +14,20 @@ class Building(Base):
     lat = Column(Float)
     lng = Column(Float)
 
-    microwaves = relationship("Microwave", back_populates="building")
+    # microwaves = relationship("Microwave", back_populates="building")
 
 
 class Microwave(Base):
     __tablename__ = "microwaves"
 
     id = Column(Integer, primary_key=True)
-    building_id = Column(Integer, ForeignKey("buildings.id"))
-    floor = Column(Integer)
+    building = Column(String)
+    # floor = Column(Integer)
     lat = Column(Float)
     lng = Column(Float)
     description = Column(String)
 
-    building = relationship("Building", back_populates="microwaves")
+    # building = relationship("Building", back_populates="microwaves")
     reports = relationship("Report", back_populates="microwave")
 
 
@@ -35,7 +35,7 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True)
-    report_date = Column(DateTime, default=datetime.utcnow)
+    report_date = Column(String)
     microwave_id = Column(Integer, ForeignKey("microwaves.id"))
 
     microwave = relationship("Microwave", back_populates="reports")

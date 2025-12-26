@@ -5,34 +5,25 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
-// // Fetch microwaves when map loads
-// fetch("/microwaves")
-//     .then(r => r.json())
-//     .then(data => {
-//         data.forEach(m => {
-//             const marker = L.marker([m.lat, m.lng]).addTo(map);
-//             marker.bindPopup(
-//                 `<b>${m.name}</b><br>` +
-//                 (m.broken ? "⚠️ Broken" : "✓ Working")
-//             );
-//         });
-//     });
-
-
 async function loadMicrowaves() {
     let res = await fetch("/microwaves");
     let data = await res.json();
 
-    data.forEach(m => {
+    data.forEach(async m => {
         let marker = L.marker([m.lat, m.lng]).addTo(map);
+        let amount = await amtreported(m.id);
 
         marker.bindPopup(`
-            <b>${m.building_id}, Floor ${m.floor}</b><br>
-            Status: ${m.broken ? "Broken" : "Working"}<br>
-            <button onclick="markBroken(${m.id})">Mark Broken</button>
+            <h3>${m.building}</h3></br>
+            ${m.desc}</br>
+            ${amount} users reported it broken.
+            <button onclick="reportBroken(${m.id})">Report Broken</button>
+        
         `);
     });
 }
+
+
 
 async function loadBuildings() {
     let res = await fetch("/buildings")
@@ -40,7 +31,6 @@ async function loadBuildings() {
 
     data.forEach(b => {
         let marker = L.marker([b.lat, b.lng]).addTo(map);
-
 
         marker.bindPopup(`
             <b>${b.name}</b></hr></br>
@@ -51,33 +41,59 @@ async function loadBuildings() {
     })
 }
 
-// async function markBroken(id) {
-//     await fetch(`/microwaves/${id}/broken`, { method: "POST" });
-//     location.reload();
-// }
+async function reportBroken(id) {
 
-// map.on("click", async (e) => {
-//     const building = prompt("Building Name");
-//     const floor = prompt("Floor");
-//     if (!building || !floor) return;
+    await fetch("/reports", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            report_date: new Date().toISOString().split('T')[0],
+            microwave_id: id
+        })
+    });
+    location.reload();
 
-//     await fetch("/microwaves", {
-//         method: "POST",
-//         headers: {"Content-Type": "application/json"},
-//         body: JSON.stringify({
-//             building: building,
-//             floor: floor,
-//             lat: e.latlng.lat,
-//             lng: e.latlng.lng
-//         })
-//     });
+}
 
-//     location.reload();
-// });
+async function amtreported(id) {
+
+    let res = await fetch("/reports")
+    let data = await res.json();
+    let amt = 0;
+
+
+    data.forEach(r => {
+        if(r.microwave_id == id) {
+            amt++;
+
+        }
+    })
+
+    return amt;
+}
+
+
+map.on("click", async (e) => {
+    const desc = prompt("Description");
+    if (!desc) return;
+    let closestBuilding = await getClosestBuilding(e);
+    console.log("closests: ", closestBuilding);
+    await fetch("/microwaves", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            building: closestBuilding,
+            lat: e.latlng.lat,
+            lng: e.latlng.lng,
+            description: desc
+        })
+    });
+
+    location.reload();
+});
 
 loadMicrowaves();
 loadBuildings();
-
 
 let userMarker = null;
 let closestLine = null;
@@ -88,7 +104,6 @@ let closestBuildingIndex = 0;
 map.locate({ setView: true, maxZoom: 16 });
 map.on("locationfound", onLocationFound);
 map.on("locationerror", onLocationError);
-
 
 function onLocationFound(e) {
     if (userMarker) map.removeLayer(userMarker);
@@ -104,10 +119,8 @@ function onLocationError(e) {
     alert(e.message);
 }
 
-
 let infoControl = L.control({ position: "bottomleft" });
 let header = L.control({position: "topright"});
-
 
 header.onAdd = function () {
     this._div = L.DomUtil.create("div", "header-panel");
@@ -144,10 +157,7 @@ infoControl.update = function (building = null) {
     `;
 };
 
-
-
 infoControl.addTo(map);
-
 
 async function locateClosestBuilding() {
 
@@ -177,6 +187,30 @@ async function locateClosestBuilding() {
     
 }
 
+async function getClosestBuilding(e){
+    let res = await fetch("/buildings");
+    let data = await res.json();
+    if(!data.length) return;
+
+    let distance = Infinity;
+    let buildingName = null;
+
+    data.forEach(b => {
+
+        if(b.lat == null || b.lng == null) return;
+
+        let buildingLatLng = L.latLng(b.lat, b.lng);
+        let templatLng = L.latLng(e.latlng.lat, e.latlng.lng);
+        let tempDist = templatLng.distanceTo(buildingLatLng);
+        if(tempDist < distance) {
+            distance = tempDist;
+            buildingName = b.name;
+        }
+    })
+
+    return buildingName;
+}
+
 function showBuilding(index) {
     if (index < 0 || index >= buildingsWithDistance.length) return;
 
@@ -192,8 +226,6 @@ function showBuilding(index) {
 
     infoControl.update(building)
 }
-
-
 
 function nextLocation() {
     let nextIndex = closestBuildingIndex + 1;

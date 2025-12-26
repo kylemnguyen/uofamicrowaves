@@ -5,7 +5,6 @@ from db import SessionLocal, init_db, seed_buildings
 from models import Microwave, Report, Building
 from datetime import datetime
 
-
 app = Flask(__name__)
 CORS(app)
 
@@ -17,7 +16,11 @@ seed_buildings()
 @app.get("/buildings")
 def get_buildings():
     db = SessionLocal()
-    buildings = db.query(Building).all()
+    buildings = (
+        db.query(Building)
+        .filter(Building.lat.isnot(None), Building.lng.isnot(None))
+        .all()
+    )
     return jsonify([{
         "id": b.id,
         "name": b.name,
@@ -26,17 +29,16 @@ def get_buildings():
         "lng": b.lng
     } for b in buildings])
     
-
 @app.get("/microwaves")
 def get_microwaves():
     db = SessionLocal()
     items = db.query(Microwave).all()
     return jsonify([{
         "id": m.id,
-        "building_id": m.building_id,
-        "floor": m.floor,
+        "building": m.building,
         "lat": m.lat,
-        "lng": m.lng
+        "lng": m.lng,
+        "desc": m.description
     } for m in items])
 
 @app.post("/microwaves")
@@ -44,14 +46,24 @@ def create_microwave():
     data = request.json
     db = SessionLocal()
     m = Microwave(
-        building=data["building_id"],
-        floor=data["floor"],
+        building=data["building"],
         lat=data["lat"],
-        lng=data["lng"]
+        lng=data["lng"],
+        description=data["description"]
     )
     db.add(m)
     db.commit()
+    print(request.json)
     return jsonify({"success": True})
+
+@app.get("/reports")
+def get_reports():
+    db = SessionLocal()
+    reports = db.query(Report).all()
+    return jsonify([{
+        "report_date": r.report_date,
+        "microwave_id": r.microwave_id
+    } for r in reports])
 
 @app.post("/reports")
 def create_report():
@@ -64,17 +76,6 @@ def create_report():
     db.add(report)
     db.commit()
     return jsonify({"success": True})
-
-
-
-
-# @app.post("/microwaves/<int:id>/broken")
-# def mark_broken(id):
-#     db = SessionLocal()
-#     m = db.query(Microwave).get(id)
-#     m.broken = True
-#     db.commit()
-#     return jsonify({"success": True})
 
 @app.get("/")
 def index():
