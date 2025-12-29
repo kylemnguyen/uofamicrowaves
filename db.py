@@ -6,9 +6,10 @@ from models import Base, Building
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(
-    DATABASE_URL,
+    DATABASE_URL.replace("postgres://", "postgresql://"),
     pool_pre_ping=True
 )
+
 
 SessionLocal = sessionmaker(bind=engine)
 
