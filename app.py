@@ -10,13 +10,13 @@ from models import Microwave, Report, Building
 app = Flask(__name__)
 CORS(app)
 
-app.secret_key = "FLASK_SECRET_KEY"
-ADMIN_PASSWORD = "ADMIN_PASSWORD"
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-
-init_db()
-seed_buildings()
-
+if os.getenv("RENDER"):
+    init_db()
+    seed_buildings()
+    
 # Admin Login
 @app.get("/admin/login")
 def admin_login_page():
