@@ -1,0 +1,41 @@
+<h2>Pending Microwaves</h2>
+<button onclick="logout()">Logout</button>
+<div id="list"></div>
+
+<script>
+async function loadPending() {
+    const res = await fetch("/admin/api/microwaves");
+    const data = await res.json();
+
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    data.forEach(m => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <b>${m.building}</b><br>
+            ${m.description}<br>
+            <button onclick="approve(${m.id})">Approve</button>
+            <button onclick="reject(${m.id})">Reject</button>
+            <hr>
+        `;
+        list.appendChild(div);
+    });
+}
+
+async function approve(id) {
+    await fetch(`/admin/api/microwaves/${id}/approve`, { method: "POST" });
+    loadPending();
+}
+
+async function reject(id) {
+    await fetch(`/admin/api/microwaves/${id}`, { method: "DELETE" });
+    loadPending();
+}
+
+function logout() {
+    window.location = "/admin/logout";
+}
+
+loadPending();
+</script>

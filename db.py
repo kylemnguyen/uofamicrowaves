@@ -1,8 +1,15 @@
+import os 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base, Building
 
-engine = create_engine("sqlite:///database.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True
+)
+
 SessionLocal = sessionmaker(bind=engine)
 
 def init_db():
@@ -69,6 +76,7 @@ def seed_buildings():
 
         session.add_all(buildings)
         session.commit()
+        session.close()
 
 if __name__ == "__main__":
     init_db()

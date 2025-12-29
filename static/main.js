@@ -8,8 +8,12 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let userMarker = null;
 let closestLine = null;
 let ulatlng = null;
+let microwavesCache = [];
+let buildingsCache = [];
 let microwavesWithDistance = [];
 let closestMicrowaveIndex = 0;
+let microwaveMarkers = {};
+let addMode = false;
 
 map.locate({ setView: true, maxZoom: 16 });
 map.on("locationfound", onLocationFound);
@@ -21,21 +25,28 @@ map.on("locationerror", onLocationError);
  * 
  */
 async function loadMicrowaves() {
-    let res = await fetch("/microwaves");
-    let data = await res.json();
+    Object.values(microwaveMarkers).forEach(m => map.removeLayer(m));
+    microwaveMarkers = {};
+    
 
-    data.forEach(async m => {
-        let marker = L.marker([m.lat, m.lng]).addTo(map);
-        let amount = await amtreported(m.id);
+    const res = await fetch("/microwaves");
+    const data = await res.json();
+    microwavesCache = data;
 
-        marker.bindPopup(`
+    data.forEach(m => {
+        const marker = L.marker([m.lat, m.lng]).addTo(map).bindPopup(`
             <h3>${m.building}</h3>
-            ${m.desc}</br>
-            ${amount} users reported it broken.</br>
+            ${m.description}<br>
+            ${m.report_amt} users reported broken<br>
             <button onclick="reportBroken(${m.id})">Report Broken</button>
-        
         `);
+
+        microwaveMarkers[m.id] = marker;
     });
+}
+
+async function loadBuildingsCache() {
+    buildingsCache = await fetch("/buildings").then(r => r.json());
 }
 
 /**
@@ -43,21 +54,22 @@ async function loadMicrowaves() {
  * Loads all building markers onto the map.
  * 
  */
-async function loadBuildings() {
-    let res = await fetch("/buildings")
-    let data = await res.json();
+// async function loadBuildings() {
+//     let res = await fetch("/buildings")
+//     let data = await res.json();
 
-    data.forEach(b => {
-        let marker = L.marker([b.lat, b.lng]).addTo(map);
+//     data.forEach(b => {
+//         let marker = L.marker([b.lat, b.lng]).addTo(map);
 
-        marker.bindPopup(`
-            <b>${b.name}</b></hr></br>
-            ${b.floors}</br>
-            Currently # of microwaves located in ${b.name}
-        `)
+//         marker.bindPopup(`
+//             <b>${b.name}</b></hr></br>
+//             ${b.floors}</br>
+//             Currently # of microwaves located in ${b.name}
+//         `)
 
-    })
-}
+//     })
+// }
+
 
 /**
  * 
@@ -67,68 +79,58 @@ async function loadBuildings() {
  * 
  */
 async function reportBroken(id) {
-
     await fetch("/reports", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            report_date: new Date().toISOString().split('T')[0],
             microwave_id: id
         })
     });
-    
-    location.reload();
+
+    let m = microwavesWithDistance.find(x => x.id === id) || microwavesCache.find(x => x.id === id);
+    if (!m || !microwaveMarkers[id]) return;
+
+    m.report_amt += 1;
+
+    microwaveMarkers[id].setPopupContent(`
+        <h3>${m.building}</h3>
+        ${m.description}<br>
+        ${m.report_amt} users reported broken<br>
+        <button onclick="reportBroken(${m.id})">Report Broken</button>
+    `);
+
+    infoControl.update(m);
 
 }
 
-// can definitely make this faster.
-/**
- * 
- * @param {*} id | microwave id
- * @returns amt | Amt of broken reports
- * TODO: only return amount of broken reports in the last 7 days
- */
-async function amtreported(id) {
-
-    let res = await fetch("/reports")
-    let data = await res.json();
-    let amt = 0;
-
-
-    data.forEach(r => {
-        if(r.microwave_id == id) {
-            amt++;
-
-        }
-    })
-
-    return amt;
-}
-
-/**
- * 
- * Temporarily allow for microwaves to be added on map clicks,
- * prompts user to add a description
- */
 map.on("click", async (e) => {
-    const desc = prompt("Description");
-    if (!desc) return;
-    let closestBuilding = await getClosestBuilding(e);
-    console.log("closests: ", closestBuilding);
+    if (!addMode) return;
+
+    const building = await getClosestBuilding(e);
+    const description = prompt("Description:");
+
+    if (!description || !building) return;
+
     await fetch("/microwaves", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            building: closestBuilding,
+            building,
+            description,
             lat: e.latlng.lat,
-            lng: e.latlng.lng,
-            description: desc
+            lng: e.latlng.lng
         })
     });
 
-    location.reload();
+    alert("Microwave submitted for review");
+
+    addMode = false; 
 });
 
+
+
+
+loadBuildingsCache();
 loadMicrowaves();
 // loadBuildings();
 
@@ -166,7 +168,8 @@ let header = L.control({position: "topright"});
 header.onAdd = function () {
     this._div = L.DomUtil.create("div", "header-panel");
     this._div.innerHTML = `
-        University of Alberta's Microwave Map
+        University of Alberta's Microwave Map<br>
+        <button id="addMicrowaveBtn">Add Microwave</button>
     `;
     return this._div;
 };
@@ -190,27 +193,34 @@ infoControl.onAdd = function () {
  * Showcases amount of people who reported the microwave broken
  * 
  */
-infoControl.update = function (microwave = null) {
-    if (!microwave) {
-        this._div.innerHTML = "Finding nearest microwave...";
+infoControl.update = function (m) {
+
+    if (!m) {
+        this._div.innerHTML = `
+            <b>Finding nearest microwave…</b>
+        `;
         return;
     }
 
-    this._div.innerHTML = `
-        Located in: <b>${microwave.building}</b> | <i>${(microwave.distance / 1000).toFixed(2)} km away </i> <br>
+    const mapsUrl = `https://www.google.com/maps?q=${m.lat},${m.lng}`;
 
-        <a href="https://www.google.com/maps?q=${microwave.lat},${microwave.lng}" 
-           target="_blank" rel="noopener">
-           Open in Google Maps
-        </a><br>
-        Description: <br>
-        ${microwave.description} <br><br>
-        <b><i>${microwave.report_amt} users reported broken</i></b>
-        <button class="report" onclick="reportBroken(${microwave.id})">Report Broken</button>
-        <button onclick="nextLocation()">Next Closest</button>
-        <button onclick="previousLocation()">Previous Closest</button>
+    this._div.innerHTML = `
+        <b>Located in:</b> ${m.building}<br>
+        <i>${(m.distance / 1000).toFixed(2)} km away</i> | 
+
+        <a href="${mapsUrl}" target="_blank" rel="noopener"> Open in Google Maps </a><br><br>
+
+        <b>Description:</b><br>
+        ${m.description}<br><br>
+
+        <b>${m.report_amt} report(s) </b> in the last 7 days.<br>
+        <button class="report" onclick="reportBroken(${m.id})">Report Broken</button>
+
+        <button onclick="previousLocation()">Previous</button>
+        <button onclick="nextLocation()">Next</button>
     `;
 };
+
 
 infoControl.addTo(map);
 
@@ -222,34 +232,24 @@ infoControl.addTo(map);
  * Calls showMicrowave() which displays the current microwave
  */
 async function locateClosestMicrowave() {
+    // const res = await fetch("/microwaves");
+    if (!ulatlng) return;
 
-    microwavesWithDistance = [];
-    closestMicrowaveIndex = 0;
-
-    let res = await fetch("/microwaves");
-    let data = await res.json();
+    const data = microwavesCache.length ? microwavesCache : await fetch("/microwaves").then(r => r.json());
     if (!data.length) return;
 
-    for (const m of data) {
-        let microwaveLatLng = L.latLng(m.lat, m.lng);
-        let tempDistance = ulatlng.distanceTo(microwaveLatLng);
-        let amt = await amtreported(m.id);
-
-        microwavesWithDistance.push({
-            id: m.id,
-            building: m.building,
-            lat: m.lat,
-            lng: m.lng,
-            report_amt: amt,
-            description: m.desc,
-            distance: tempDistance
-        });
-    };
+    microwavesWithDistance = data.map(m => ({
+        id: m.id,
+        building: m.building,
+        lat: m.lat,
+        lng: m.lng,
+        report_amt: m.report_amt,
+        description: m.description,
+        distance: ulatlng.distanceTo(L.latLng(m.lat, m.lng))
+    }));
 
     microwavesWithDistance.sort((a, b) => a.distance - b.distance);
-
     showMicrowave(0);
-    
 }
 
 /**
@@ -259,29 +259,27 @@ async function locateClosestMicrowave() {
  * 
  * grabs the closest building for the microwave for it's description
  */
-async function getClosestBuilding(e){
-    let res = await fetch("/buildings");
-    let data = await res.json();
-    if(!data.length) return;
+async function getClosestBuilding(e) {
+    if (!buildingsCache.length) return null;
 
     let distance = Infinity;
     let buildingName = null;
 
-    data.forEach(b => {
+    buildingsCache.forEach(b => {
+        if (b.lat == null || b.lng == null) return;
 
-        if(b.lat == null || b.lng == null) return;
+        const tempDist = L.latLng(e.latlng.lat, e.latlng.lng)
+            .distanceTo(L.latLng(b.lat, b.lng));
 
-        let buildingLatLng = L.latLng(b.lat, b.lng);
-        let templatLng = L.latLng(e.latlng.lat, e.latlng.lng);
-        let tempDist = templatLng.distanceTo(buildingLatLng);
-        if(tempDist < distance) {
+        if (tempDist < distance) {
             distance = tempDist;
             buildingName = b.name;
         }
-    })
+    });
 
     return buildingName;
 }
+
 
 /**
  * 
@@ -315,7 +313,7 @@ function nextLocation() {
 
     if (nextIndex >= microwavesWithDistance.length) {
         alert("No more microwaves.");
-        return;ß
+        return;
     }
 
     showMicrowave(nextIndex);
@@ -331,3 +329,52 @@ function previousLocation() {
 
     showMicrowave(nextIndex);
 }
+
+// Admin stuff
+
+async function loadPending() {
+    const res = await fetch("/admin/microwaves", {
+        headers: { "X-ADMIN-KEY": "SECRET123" }
+    });
+    const data = await res.json();
+
+    document.body.innerHTML = "<h2>Pending Microwaves</h2>";
+
+    data.forEach(m => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <b>${m.building}</b><br>
+            ${m.description}<br>
+            <button onclick="approve(${m.id})">Approve</button>
+            <button onclick="reject(${m.id})">Reject</button>
+            <hr>
+        `;
+        document.body.appendChild(div);
+    });
+}
+
+async function approve(id) {
+    await fetch(`/admin/microwaves/${id}/approve`, {
+        method: "POST",
+        headers: { "X-ADMIN-KEY": "SECRET123" }
+    });
+    loadPending();
+}
+
+async function reject(id) {
+    await fetch(`/admin/microwaves/${id}`, {
+        method: "DELETE",
+        headers: { "X-ADMIN-KEY": "SECRET123" }
+    });
+    loadPending();
+}
+
+document.getElementById("addMicrowaveBtn").onclick = () => {
+    addMode = !addMode;
+
+    alert(
+        addMode
+            ? "Click on the map to add a microwave"
+            : "Add mode cancelled"
+    );
+};

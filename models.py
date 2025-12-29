@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
@@ -14,20 +14,24 @@ class Building(Base):
     lat = Column(Float)
     lng = Column(Float)
 
-    # microwaves = relationship("Microwave", back_populates="building")
+    microwaves = relationship("Microwave", back_populates="building")
 
 
 class Microwave(Base):
     __tablename__ = "microwaves"
 
     id = Column(Integer, primary_key=True)
-    building = Column(String)
-    # floor = Column(Integer)
-    lat = Column(Float)
-    lng = Column(Float)
+
+    building_id = Column(Integer, ForeignKey("buildings.id"), nullable=False)
+    building = relationship("Building", back_populates="microwaves")
+
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
     description = Column(String)
 
-    # building = relationship("Building", back_populates="microwaves")
+    approved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
     reports = relationship("Report", back_populates="microwave")
 
 
@@ -35,7 +39,7 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True)
-    report_date = Column(String)
-    microwave_id = Column(Integer, ForeignKey("microwaves.id"))
+    report_date = Column(DateTime, default=datetime.utcnow)
 
+    microwave_id = Column(Integer, ForeignKey("microwaves.id"))
     microwave = relationship("Microwave", back_populates="reports")
