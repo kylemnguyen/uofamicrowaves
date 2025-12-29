@@ -168,7 +168,7 @@ let header = L.control({position: "topright"});
 header.onAdd = function () {
     this._div = L.DomUtil.create("div", "header-panel");
     this._div.innerHTML = `
-        University of Alberta's Microwave Map<br>
+        <div class="header-title">University of Alberta's Microwave Map</div>
         <button id="addMicrowaveBtn">Add Microwave</button>
     `;
     return this._div;
