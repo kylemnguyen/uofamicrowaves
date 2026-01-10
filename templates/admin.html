@@ -1,41 +1,30 @@
-<h2>Pending Microwaves</h2>
-<button onclick="logout()">Logout</button>
-<div id="list"></div>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UofA Microwave Map</title>
 
-<script>
-async function loadPending() {
-    const res = await fetch("/admin/api/microwaves");
-    const data = await res.json();
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    const list = document.getElementById("list");
-    list.innerHTML = "";
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet/dist/leaflet.css"
+    />
 
-    data.forEach(m => {
-        const div = document.createElement("div");
-        div.innerHTML = `
-            <b>${m.building}</b><br>
-            ${m.description}<br>
-            <button onclick="approve(${m.id})">Approve</button>
-            <button onclick="reject(${m.id})">Reject</button>
-            <hr>
-        `;
-        list.appendChild(div);
-    });
-}
+    <link rel="stylesheet" href="static/admin.css">
 
-async function approve(id) {
-    await fetch(`/admin/api/microwaves/${id}/approve`, { method: "POST" });
-    loadPending();
-}
+</head>
 
-async function reject(id) {
-    await fetch(`/admin/api/microwaves/${id}`, { method: "DELETE" });
-    loadPending();
-}
+    <body>
 
-function logout() {
-    window.location = "/admin/logout";
-}
+        <h2>Pending Microwaves</h2>
+        <button onclick="logout()">Logout</button>
+        <div id="list"></div>
 
-loadPending();
-</script>
+        <div id="map"></div>
+
+        
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="/static/admin.js"></script>
+
+    </body>
+</html>
