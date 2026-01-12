@@ -273,6 +273,43 @@ def reject_microwave(id):
     db.close()
     return {"success": True}
 
+@app.get("/microwaves/reports")
+def get_microwaves_total_reports():
+    db = SessionLocal()
+
+    rows = (
+        db.query(
+            Microwave.id,
+            Microwave.lat,
+            Microwave.lng,
+            Microwave.description,
+            Building.name.label("building"),
+            func.count(Report.id).label("report_amt")
+        )
+        .join(Building, Microwave.building_id == Building.id)
+        .outerjoin(Report, Report.microwave_id == Microwave.id)
+        .filter(Microwave.approved.is_(True))
+        .group_by(
+            Microwave.id,
+            Microwave.lat,
+            Microwave.lng,
+            Microwave.description,
+            Building.name
+        )
+        .all()
+    )
+
+    return jsonify([
+        {
+            "id": id,
+            "lat": lat,
+            "lng": lng,
+            "description": description,
+            "building": building,
+            "report_amt": report_amt
+        }
+        for id, lat, lng, description, building, report_amt in rows
+    ])
 
 
 @app.get("/")
@@ -281,3 +318,5 @@ def index():
 
 if __name__ == "__main__":
     app.run(debug=True)
+    
+    
