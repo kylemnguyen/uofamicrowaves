@@ -1,3 +1,8 @@
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadReportsData();
+});
+
 const map = L.map('map').setView([53.5232, -113.5263], 15);
 
 // OpenStreetMap tiles
@@ -45,7 +50,7 @@ async function loadReportsData()
     const res = await fetch("/microwaves/reports");
     const data = await res.json();
     data.sort((a, b) => b.report_amt - a.report_amt);
-    
+
     const list = document.getElementById("reports");
     list.innerHTML = "";
 
@@ -63,4 +68,3 @@ async function loadReportsData()
  }
 
 loadPending();
-loadReportsData();
