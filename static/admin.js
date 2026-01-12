@@ -40,4 +40,27 @@ function logout() {
     window.location = "/admin/logout";
 }
 
+async function loadReportsData()
+ {
+    const res = await fetch("/microwaves/reports");
+    const data = await res.json();
+    data.sort((a, b) => b.report_amt - a.report_amt);
+    
+    const list = document.getElementById("reports");
+    list.innerHTML = "";
+
+    data.forEach(m => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+            <b>${m.building}</b><br>
+            ${m.description}<br>
+            total reports: ${m.report_amt}        
+            <hr>    
+            `;
+        list.appendChild(div);
+    })
+
+ }
+
 loadPending();
+loadReportsData();
