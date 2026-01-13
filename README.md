@@ -70,9 +70,11 @@ Deployed using Render
 ## Future Improvements
 
 - User authentication for reporting validation
-- Analytics on frequently reported microwaves
 - Mobile and accessibility improvements
 - Indoor and floor-level microwave locations
+- Spam deterrent
+- Better UX / UI Flow for microwave submission
+- Possiblity for a "busyness" setting
 
 ---
 
